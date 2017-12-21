@@ -31,6 +31,10 @@ double sgn(const double &d)
 {
     return d < 0.0 ? -1.0 : d > 0.0 ? 1.0 : 0.0;
 }
+double loop(double a)
+{
+	return (sin(a) + 1.0) * 0.5;
+}
 
 struct XY {
     double x;
@@ -180,12 +184,13 @@ struct Scene {
     long height;
     double pixel_size;
     XY size;
+	double timer;
 
     std::vector<Particle> particles;
     std::vector<Particle> particles_tmp;
     QueueProcessor qp;
 
-    Scene() : width(0), height(0), pixel_size(0.0)
+    Scene() : width(0), height(0), pixel_size(0.0), size(0, 0), timer(0)
     {
     }
 
@@ -201,14 +206,16 @@ struct Scene {
         pixel_size = 1.0 / (width > height ? width : height);
         size = XY(width * pixel_size, height * pixel_size);
         XY half_size = size * 0.5;
+		timer = 0; 
 
         double a = 0;
         double dp = 2 * M_PI / 3;
-        double da = M_PI / particles_count;
+        double da = 2 * M_PI / particles_count;
         particles.resize(particles_count);
+		double x = 0;
         for (auto &p : particles) {
             p.pos.rand_pos(half_size, half_size);
-            p.vel.rand_angle(0.5);
+//            p.vel.rand_angle(0.5);
             p.col = Color(
                 (sin(a)+1)*0.5,
                 (sin(a + dp)+1)*0.5,
@@ -251,7 +258,7 @@ struct Scene {
             multi_force += vec * (sqr(id) );
 
         }
-        return multi_force * 0.01;
+        return multi_force * 0.01 * inv(particles.size());
     }
 
     XY force(const Particle& p)
@@ -320,12 +327,11 @@ struct Scene {
             Color col(0);
             double aid = 0;
             for (const auto &p : particles) {
-                double id = inv(pos.dist(p.pos));
-                aid += inv(sqr(10 - id)) + id * 1e-1;
-                col += p.col * id * 0.5;
+                double id = inv(pos.dist(p.pos)*2);
+                aid += inv(sqr((10 - id)*0.5)) + id*2;
+                col += p.col * id;
             }
-            col *= 0.1 * aid / particles.size();
-
+            col *=  aid * inv((particles.size())) * 0.01;
 
             *pixel = SDL_MapRGBA(img->format, lum(col.r), lum(col.g), lum(col.b), 0x00);
         }
@@ -356,6 +362,8 @@ struct Scene {
             ++p_in;
             ++p_out;
         }
+
+		timer += time_step;
         qp.wait();
         std::swap(particles, particles_tmp);
     }

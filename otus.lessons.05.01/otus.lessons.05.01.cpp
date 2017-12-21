@@ -44,7 +44,7 @@ int main(int argc, char** argv)
                           SDL_WINDOWPOS_CENTERED,
                           width,
                           height,
-                          SDL_WINDOW_SHOWN
+                          SDL_WINDOW_SHOWN | SDL_WINDOW_FULLSCREEN
                       );
     if (win == nullptr) {
         console->error("SDL_CreateWindow Error: {1}", SDL_GetError());
@@ -55,7 +55,7 @@ int main(int argc, char** argv)
     SDL_Surface *scr = SDL_GetWindowSurface(win);
     SDL_Surface *img = SDL_CreateRGBSurface(0, scr->w, scr->h, 32, 0, 0, 0, 0);
 
-    scene.init(width, height, 9);
+    scene.init(scr->w, scr->h, 5);
 
     auto start = std::chrono::system_clock::now();
     auto last = start;
