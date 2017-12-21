@@ -11,26 +11,11 @@
 #include "global.h"
 #include "queue_processor.h"
 
-Uint8 lum(const double &d)
-{
-    return d < 0.0 ? 0 : d > 1.0 ? 255 : (Uint8)(255 * d);
-}
-double inv(const double &d)
-{
-    return d < 1e-4 ? 1e4 : 1.0/d;
-}
-double sqr(const double &d)
-{
-    return d*d;
-}
-double tri(const double &d)
-{
-    return d*d*d;
-}
-double sgn(const double &d)
-{
-    return d < 0.0 ? -1.0 : d > 0.0 ? 1.0 : 0.0;
-}
+Uint8 lum(const double &d) { return d < 0.0 ? 0 : d > 1.0 ? 255 : (Uint8)(255 * d); }
+double inv(const double &d) { return d < 1e-4 ? 1e4 : 1.0/d; }
+double sqr(const double &d) { return d*d; }
+double tri(const double &d) { return d*d*d; }
+double sgn(const double &d) { return d < 0.0 ? -1.0 : d > 0.0 ? 1.0 : 0.0; }
 
 struct XY {
     double x;
@@ -56,68 +41,41 @@ struct XY {
         return *this;
     }
 
-    XY& operator=(const XY &xy_)
-    {
+    XY& operator=(const XY &xy_) {
         x = xy_.x;
         y = xy_.y;
         return *this;
     }
 
-    XY operator+(const XY &xy_) const
-    {
+    XY operator+(const XY &xy_) const {
         return XY(x + xy_.x, y + xy_.y);
     }
 
-    XY& operator+=(const XY &xy_)
-    {
-        x += xy_.x;
-        y += xy_.y;
-        return *this;
-    }
-
-    XY operator-(const XY &xy_) const
-    {
+    XY operator-(const XY &xy_) const {
         return XY(x - xy_.x, y - xy_.y);
     }
 
-    XY operator*(const XY &xy_) const
-    {
+    XY operator*(const XY &xy_) const {
         return XY(x * xy_.x, y * xy_.y);
     }
 
-    XY operator*(const double &d) const
-    {
+    XY operator*(const double &d) const {
         return XY(x *d, y *d);
     }
-    XY& operator*=(const double &d)
-    {
-        x *= d;
-        y *= d;
-        return *this;
-    }
 
-    bool in_box(const XY& xy_, double d) const
-    {
+    bool in_box(const XY& xy_, double d) const {
         return fabs(x - xy_.x) < d && fabs(y - xy_.y) < d;
     }
 
-    double dist2(const XY& xy_) const
-    {
+    double dist2(const XY& xy_) const {
         return sqr(x - xy_.x) + sqr(y - xy_.y);
     }
 
-    double dist(const XY& xy_) const
-    {
+    double dist(const XY& xy_) const {
         return sqrt(sqr(x - xy_.x) + sqr(y - xy_.y));
     }
 
-    double dist() const
-    {
-        return sqrt(sqr(x) + sqr(y));
-    }
-
-    XY vec(const XY& xy_) const
-    {
+    XY vec(const XY& xy_) const {
         return (*this) * inv(dist(xy_));
     }
 };
@@ -132,8 +90,7 @@ struct Color {
     Color(const double &r_, const double &g_, const double &b_) : r(r_), g(g_), b(b_) {}
     Color(const Color &col) : r(col.r), g(col.g), b(col.b) {}
 
-    Color& rand()
-    {
+    Color& rand() {
         r = urd(gen);
         g = urd(gen);
         b = urd(gen);
@@ -141,30 +98,12 @@ struct Color {
         return *this;
     }
 
-    Color operator*(const double &d) const
-    {
+    Color operator*(const double &d) const {
         return Color(r *d, g *d, b*d);
     }
 
-    Color& operator*=(const double &d)
-    {
-        r *= d;
-        g *= d;
-        b *= d;
-        return *this;
-    }
-
-    Color operator+(const Color &col_) const
-    {
+    Color operator+(const Color &col_) const {
         return Color(r +col_.r, g +col_.g, b+col_.b);
-    }
-
-    Color& operator+=(const Color &col_)
-    {
-        r += col_.r;
-        g += col_.g;
-        b += col_.b;
-        return *this;
     }
 
 };
@@ -189,8 +128,7 @@ struct Scene {
     {
     }
 
-    ~Scene()
-    {
+    ~Scene() {
         qp.join();
     }
 
@@ -202,19 +140,11 @@ struct Scene {
         size = XY(width * pixel_size, height * pixel_size);
         XY half_size = size * 0.5;
 
-        double a = 0;
-        double dp = 2 * M_PI / 3;
-        double da = M_PI / particles_count;
         particles.resize(particles_count);
         for (auto &p : particles) {
             p.pos.rand_pos(half_size, half_size);
             p.vel.rand_angle(0.5);
-            p.col = Color(
-                (sin(a)+1)*0.5,
-                (sin(a + dp)+1)*0.5,
-                (sin(a + dp * 2)+1)*0.5
-            );
-            a += da;
+            p.col.rand();
         }
         particles_tmp = particles;
 
@@ -244,23 +174,24 @@ struct Scene {
         for (auto &p : particles) {
             if(&p == &p_)
                 continue;
+            
+            double di = p_.pos.dist(p.pos);
+            XY d = (p_.pos - p.pos) * inv(di);
+            XY s(sgn(d.x), sgn(d.y));
+            double f = sqr(di - 0.1);
 
-            double id = inv(p_.pos.dist(p.pos));
-            XY vec = (p_.pos - p.pos) * id;
-
-            multi_force += vec * (sqr(id) );
-
+            multi_force.x -= d.x*f*100;
+            multi_force.y -= d.y*f*100;
         }
-        return multi_force * 0.01;
+        return multi_force;
     }
 
-    XY force(const Particle& p)
-    {
-        // return edge_force(p) + friction_force(p);
-        return edge_force(p) + friction_force(p) + multi_particle_force(p);
+    XY force(const Particle& p) {
+        return edge_force(p) + friction_force(p);
+        // return edge_force(p) + friction_force(p) + multi_particle_force(p);
     }
 
-    void step_particle(double time_step, const Particle& p_in, Particle& p_out)
+    void step_particle(double time_step, const Particle& p_in, Particle& p_out) 
     {
         XY pos_step = p_in.vel;
         XY vel_step = force(p_in);
@@ -284,8 +215,6 @@ struct Scene {
             p_out.pos.y = 2.0*size.y - p_out.pos.y;
             p_out.vel.y = -p_out.vel.y;
         }
-        if(p_out.vel.dist() < 0.01)
-            p_out.vel.rand_angle(0.5);
     }
 
     void step(double time_step)
@@ -293,9 +222,7 @@ struct Scene {
         auto p_in = particles.cbegin();
         auto p_out = particles_tmp.begin();
         while(p_in != particles.cend()) {
-            qp.add([=]() {
-                step_particle(time_step, *p_in, *p_out);
-            });
+            qp.add([=]() { step_particle(time_step, *p_in, *p_out); });
             ++p_in;
             ++p_out;
         }
@@ -318,14 +245,20 @@ struct Scene {
 
         for (long x = 0; x < width; ++x, ++pixel, pos.x += pixel_size) {
             Color col(0);
-            double aid = 0;
+            double level = 0;
+            bool in_box = false;
             for (const auto &p : particles) {
-                double id = inv(pos.dist(p.pos));
-                aid += inv(sqr(10 - id)) + id * 1e-1;
-                col += p.col * id * 0.5;
+                double di = pos.dist(p.pos);
+                if(di < 0.01) {
+                    in_box = true;
+                    col = p.col;
+                    continue;
+                }
+                col = col + p.col * di * inv(sqr(sqr(di*5-0.2)));
             }
-            col *= 0.1 * aid / particles.size();
 
+            if(!in_box)
+                col = col * ipc;
 
             *pixel = SDL_MapRGBA(img->format, lum(col.r), lum(col.g), lum(col.b), 0x00);
         }
@@ -334,29 +267,7 @@ struct Scene {
     void render(SDL_Surface* img)
     {
         for (long y = 0; y < height; ++y)
-            qp.add([=]() {
-            fill_image_line(img, y);
-        });
+            qp.add([=]() {fill_image_line(img, y); });
         qp.wait();
-    }
-
-    void process(SDL_Surface* img, double time_step)
-    {
-        for (long y = 0; y < height; ++y)
-            qp.add([=]() {
-            fill_image_line(img, y);
-        });
-
-        auto p_in = particles.cbegin();
-        auto p_out = particles_tmp.begin();
-        while(p_in != particles.cend()) {
-            qp.add([=]() {
-                step_particle(time_step, *p_in, *p_out);
-            });
-            ++p_in;
-            ++p_out;
-        }
-        qp.wait();
-        std::swap(particles, particles_tmp);
     }
 };
